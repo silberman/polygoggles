@@ -18,6 +18,7 @@ The number of edges in the polygon is included in the filename.
 from __future__ import print_function
 from __future__ import division
 
+import argparse
 import math
 import os
 from PIL import Image, ImageDraw
@@ -32,8 +33,11 @@ IMAGES_DIR = os.path.join(THIS_DIR, "images")
 def draw_random_polygon(max_edges=9, allow_rotation=True, image_width=480, image_height=640):
     num_edges = random.randint(3, max_edges)
 
+    # Figure out some reasonable bounds on the edge_size for an image of the given size.
     max_allowed_edge_length = int(min(image_width, image_height) / 3.3)
-    edge_length = random.randint(10, max_allowed_edge_length)
+    min_allowed_edge_length = min(10, max_allowed_edge_length)
+    edge_length = random.randint(min_allowed_edge_length, max_allowed_edge_length)
+
     if allow_rotation:
         rotate_degrees = random.uniform(0.0, 360.0)
     else:
@@ -81,10 +85,10 @@ def draw_polygon(num_edges, edge_length=30, rotate_degrees=0,
     drawer = ImageDraw.Draw(image)
     drawer.polygon(vertices, fill=128, outline=128)
 
-    # Write the image to a file.  We include the number of edges as a label in the filename. The
-    # rest of the filename is just to avoid duplicate filenames.
-    output_partial_filename = "polygon_%s_%s%s.png" % (
-                                num_edges, int(time.time()), int(random.random() * 100000))
+    # Write the image to a file.  We include the number of edges as a label in the filename,
+    # along with the width and height. The rest of the filename is just to avoid duplicates.
+    output_partial_filename = "polygon_%s_%s_%s_%s%s.png" % (
+        num_edges, image_width, image_height, int(time.time()), int(random.random() * 100000))
     output_full_filename = os.path.join(IMAGES_DIR, output_partial_filename)
     image.save(output_full_filename, "PNG")
     if show:
@@ -132,10 +136,14 @@ def _rotate_polygon(vertices, degrees):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("\nExample usage: python make_polygon_pngs.py 20\n")
-        sys.exit(2)
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('num_images', help='How many images to make.', type=int)
+    parser.add_argument('width', help='Pixel width of the images to make.', type=int)
+    parser.add_argument('height', help='Pixel height of the imags to make.', type=int)
+    args = parser.parse_args()
 
-    num_polygons = int(sys.argv[1])
-    for __ in range(num_polygons):
-        draw_random_polygon(max_edges=9, allow_rotation=True)
+    for __ in range(args.num_images):
+        draw_random_polygon(max_edges=9, image_width=args.width,
+                            image_height=args.height, allow_rotation=True)
