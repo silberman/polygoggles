@@ -5,7 +5,7 @@ Currently just a script to generate images of polygons for training.
 
 ## Installation
 
-Ideally from a virtualenv:
+Ideally from a python3 virtualenv:
 
 ```
 pip install -r requirements.txt

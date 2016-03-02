@@ -14,6 +14,10 @@ a .png to the /images directory.
 The number of edges in the polygon is included in the filename.
 """
 
+# imports for python2 backward compatibility
+from __future__ import print_function
+from __future__ import division
+
 import math
 import os
 from PIL import Image, ImageDraw
@@ -34,8 +38,8 @@ def draw_random_polygon(max_edges=9, allow_rotation=True, image_width=480, image
         rotate_degrees = random.uniform(0.0, 360.0)
     else:
         rotate_degrees = 0
-    draw_polygon(num_edges, edge_length=edge_length, rotate_degrees=rotate_degrees,
-                image_width=image_width, image_height=image_height)
+    return draw_polygon(num_edges, edge_length=edge_length, rotate_degrees=rotate_degrees,
+                        image_width=image_width, image_height=image_height)
 
 
 def draw_polygon(num_edges, edge_length=30, rotate_degrees=0,
@@ -85,7 +89,8 @@ def draw_polygon(num_edges, edge_length=30, rotate_degrees=0,
     image.save(output_full_filename, "PNG")
     if show:
         image.show()
-    print "Wrote:", output_full_filename
+    print("Wrote:", output_full_filename)
+    return output_full_filename
 
 def _angles_of_a_polygon(num_edges):
     """
@@ -128,7 +133,7 @@ def _rotate_polygon(vertices, degrees):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print "\nExample usage: python make_polygon_pngs.py 20\n"
+        print("\nExample usage: python make_polygon_pngs.py 20\n")
         sys.exit(2)
 
     num_polygons = int(sys.argv[1])
