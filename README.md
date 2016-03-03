@@ -8,7 +8,8 @@ Currently just a script to generate images of polygons for training.
 Ideally from a python3 virtualenv:
 
 ```
-pip install -r requirements.txt
+pip3 install -r requirements.txt
+pip3 install --upgrade https://storage.googleapis.com/tensorflow/mac/tensorflow-0.7.1-cp35-none-any.whl
 ```
 
 ## Example Usage
