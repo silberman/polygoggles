@@ -178,7 +178,8 @@ def main():
     num_test_images = math.ceil(0.2 * args.num_images)
     num_train_images = args.num_images - num_test_images
 
-    make_collection(args.width, args.height, num_train_images, num_test_images)
+    collection_base = make_collection(args.width, args.height, num_train_images, num_test_images)
+    print("Wrote files to", collection_base)
 
 
 if __name__ == "__main__":
