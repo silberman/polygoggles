@@ -1,4 +1,3 @@
-#!/usr/bin/python
 """
 Functions for generating random polygon PNGs.
 
@@ -14,10 +13,6 @@ a .png to the /images directory.
 The number of edges in the polygon is included in the filename.
 """
 
-# imports for python2 backward compatibility
-from __future__ import print_function
-from __future__ import division
-
 import argparse
 import math
 import os
@@ -27,10 +22,10 @@ import sys
 import time
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-IMAGES_DIR = os.path.join(THIS_DIR, "images")
+BASE_IMAGES_DIR = os.path.join(THIS_DIR, "images")
 
-
-def draw_random_polygon(max_edges=9, allow_rotation=True, image_width=480, image_height=640):
+def draw_random_polygon(image_dir, max_edges=9, allow_rotation=True, image_width=480,
+                        image_height=640):
     num_edges = random.randint(3, max_edges)
 
     # Figure out some reasonable bounds on the edge_size for an image of the given size.
@@ -42,11 +37,14 @@ def draw_random_polygon(max_edges=9, allow_rotation=True, image_width=480, image
         rotate_degrees = random.uniform(0.0, 360.0)
     else:
         rotate_degrees = 0
-    return draw_polygon(num_edges, edge_length=edge_length, rotate_degrees=rotate_degrees,
-                        image_width=image_width, image_height=image_height)
+    return draw_polygon(num_edges,
+                        image_dir,
+                        edge_length=edge_length,
+                        rotate_degrees=rotate_degrees,
+                        image_width=image_width,
+                        image_height=image_height)
 
-
-def draw_polygon(num_edges, edge_length=30, rotate_degrees=0,
+def draw_polygon(num_edges, image_dir, edge_length=30, rotate_degrees=0,
                  image_width=100, image_height=100, show=False):
     """
     Draw a polygon and save it as a PNG.  Return the filename created.
@@ -67,7 +65,7 @@ def draw_polygon(num_edges, edge_length=30, rotate_degrees=0,
 
     # offset it such that it's near the center. Having rotated around the origin (top left in PIL),
     # it may currently have a negative x or y, so "off" the visible image canvas.  So we'll find
-    # the left-most point and move just onto the image, along with the other points appropriately.
+    # the left-most point and move it to a bit left of center, and the other points appropriately.
     center_x = image_width / 2
     center_y = image_height / 2
     lowest_x_seen, y_of_lowest_x = None, None
@@ -89,7 +87,7 @@ def draw_polygon(num_edges, edge_length=30, rotate_degrees=0,
     # along with the width and height. The rest of the filename is just to avoid duplicates.
     output_partial_filename = "polygon_%s_%s_%s_%s%s.png" % (
         num_edges, image_width, image_height, int(time.time()), int(random.random() * 100000))
-    output_full_filename = os.path.join(IMAGES_DIR, output_partial_filename)
+    output_full_filename = os.path.join(image_dir, output_partial_filename)
     image.save(output_full_filename, "PNG")
     if show:
         image.show()
@@ -134,8 +132,39 @@ def _rotate_polygon(vertices, degrees):
         rotated_vertices.append(rotated_vertex)
     return rotated_vertices
 
+def make_collection(image_width, image_height, num_train_images, num_test_images,
+                    root_dir=BASE_IMAGES_DIR):
+    """
+    A collection is a directory of directories of images, with all images of the same shape.
 
-if __name__ == "__main__":
+    For instance, making a collection of 28x28 images will create a directory like:
+    root_dir/coll_28_28_1457049237/train/1000_train_images
+    root_dir/coll_28_28_1457049237/test/100_test_images
+
+    Return the path to the collection directory.
+    """
+    assert num_train_images > 0 and num_test_images > 0
+    collection_dir_name = "coll_%s_%s_%s" % (image_width, image_height, int(time.time()))
+    full_collection_dir = os.path.join(root_dir, collection_dir_name)
+    train_dir = os.path.join(full_collection_dir, "train")
+    test_dir = os.path.join(full_collection_dir, "test")
+
+    # Note: will have collection_dir_name duplicates if you're making more than 1 collection/sec
+    assert not os.path.exists(full_collection_dir)
+    os.makedirs(train_dir)
+    os.makedirs(test_dir)
+
+    train_names = [draw_random_polygon(train_dir, image_width=image_width, image_height=image_height)
+                   for __ in range(num_train_images)]
+    test_names = [draw_random_polygon(test_dir, image_width=image_width, image_height=image_height)
+                   for __ in range(num_test_images)]
+
+    return full_collection_dir
+
+def main():
+    """
+    Make a collection of images based on the command line args.
+    """
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -143,7 +172,14 @@ if __name__ == "__main__":
     parser.add_argument('width', help='Pixel width of the images to make.', type=int)
     parser.add_argument('height', help='Pixel height of the imags to make.', type=int)
     args = parser.parse_args()
+    assert args.num_images > 1
 
-    for __ in range(args.num_images):
-        draw_random_polygon(max_edges=9, image_width=args.width,
-                            image_height=args.height, allow_rotation=True)
+    # We'll put ~20% of these images in a /test subdirectory, and ~80% in /train
+    num_test_images = math.ceil(0.2 * args.num_images)
+    num_train_images = args.num_images - num_test_images
+
+    make_collection(args.width, args.height, num_train_images, num_test_images)
+
+
+if __name__ == "__main__":
+    main()
