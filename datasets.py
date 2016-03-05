@@ -7,7 +7,8 @@ https://github.com/tensorflow/tensorflow/blob/master/tensorflow/examples/tutoria
 
 import numpy
 import os
-from PIL import Image
+from PIL import Image, ImageOps
+import random
 import tensorflow as tf
 
 
@@ -29,6 +30,12 @@ class DataSet(object):
         # Convert shape from [num examples, rows, columns, depth]
         # to [num examples, rows*columns] (assuming depth == 1)
         assert images.shape[3] == 1
+
+        # Store the width and height of the images before flattening it, if only for reference.
+        image_height, image_width = images.shape[1], images.shape[2]
+        self.original_image_width = image_width
+        self.original_image_height = image_height
+
         images = images.reshape(images.shape[0], images.shape[1] * images.shape[2])
         if dtype == tf.float32:
             # Convert from [0, 255] -> [0.0, 1.0]
@@ -55,6 +62,25 @@ class DataSet(object):
     def epochs_completed(self):
         return self._epochs_completed
 
+    def next_batch(self, batch_size):
+      """Return the next `batch_size` examples from this data set."""
+      start = self._index_in_epoch
+      self._index_in_epoch += batch_size
+      if self._index_in_epoch > self._num_examples:
+          # Finished epoch
+          self._epochs_completed += 1
+          # Shuffle the data
+          perm = numpy.arange(self._num_examples)
+          numpy.random.shuffle(perm)
+          self._images = self._images[perm]
+          self._labels = self._labels[perm]
+          # Start next epoch
+          start = 0
+          self._index_in_epoch = batch_size
+          assert batch_size <= self._num_examples
+      end = self._index_in_epoch
+      return self._images[start:end], self._labels[start:end]
+
 def get_image_info_from_filename(image_filename):
     """
     Return num_edges, width, height from the given image_filename.
@@ -63,7 +89,8 @@ def get_image_info_from_filename(image_filename):
     or full paths to a file with a basename of that form.
     """
     base_filename = os.path.basename(image_filename) # just the polygon_4_480_640_14....png part
-    __, num_edges, width, height, __ = base_filename.split('_')
+    underscore_splits = base_filename.split('_')
+    __, num_edges, width, height = underscore_splits[:4]
     num_edges, width, height = map(int, [num_edges, width, height])
     return num_edges, width, height
 
@@ -85,20 +112,27 @@ def get_image_filenames_of_size(width, height, images_dir):
             filenames.append(os.path.join(images_dir, filename))
     return filenames
 
-def extract_images_and_labels(images_dir, width, height, one_hot):
+def extract_images_and_labels(images_dir, width, height, num_labels=10):
     """
     Extracts from images in the given directory, of the given dimensions,
-    into a 4D uint8 numpy array [index, y, x, depth], and a 1D numpy_array of labels
+    into a 4D uint8 numpy array [index, y, x, depth],
+    and a 2D numpy_array of one_hot labels of shape (num_images, num_labels)
     """
     eligible_files = get_image_filenames_of_size(width, height, images_dir=images_dir)
     num_images = len(eligible_files)
 
     # Initialize a numpy array to hold all the images, and reshape (only 3D for now)
-    images_array = numpy.zeros(num_images * width * height)
-    images_array = images_array.reshape(num_images, width, height)
+    images_array = numpy.zeros(num_images * width * height, dtype=numpy.uint8)
+    images_array = images_array.reshape(num_images, height, width)
 
     # Initalize a 1D array for the labels
-    labels_array = numpy.zeros(num_images, dtype=numpy.uint8)
+    labels_array = numpy.zeros(num_images * num_labels, dtype=numpy.float32)
+    labels_array = labels_array.reshape(num_images, num_labels)
+
+    print("Extracting %s images and labels from %s/..." % (num_images, images_dir))
+
+    # Shuffle the filenames to randomize the order of data.
+    random.shuffle(eligible_files)
 
     for index, image_filename in enumerate(eligible_files):
         # Get info we'll need from the filename itself (we only really need the label)
@@ -106,29 +140,25 @@ def extract_images_and_labels(images_dir, width, height, one_hot):
         assert width_in_filename == width
         assert height_in_filename == height
 
-        # Open the file as a PIL image with mode P, for 8-bit pixels
-        # other modes: http://pillow.readthedocs.org/en/3.1.x/handbook/concepts.html#concept-modes
-        # WEB is default palette, other option is "ADAPTIVE"
 
         # double-withs is a workaround for PIL bug causing ResourceWarning: unclosed file
         # described here: https://github.com/python-pillow/Pillow/issues/835
         with open(image_filename, 'rb') as img_file:
             with Image.open(img_file) as open_pil_img:
-                pil_image = open_pil_img.convert("P", palette="WEB")
+                pil_image = open_pil_img.convert("L")
+                pil_image = ImageOps.invert(pil_image)
 
         image_array = numpy.asarray(pil_image, dtype=numpy.uint8)
         images_array[index] = image_array
 
-        # Now add the label to the labels_array
-        labels_array[index] = label
+        # Now set the one_hot value for this label
+        labels_array[index][label] = 1
 
     # Reshape to add a depth dimension
-    print("doing depth reshape")
     images_array = images_array.reshape(num_images, width, height, 1)
-    print("done with depth reshape, should have been nearly instant")
     return images_array, labels_array
 
-def read_data_sets(collection_directory, one_hot=True, dtype=tf.float32):
+def read_data_sets(collection_directory, dtype=tf.float32):
     """
     Return a container DataSets object holding training and test DataSet objects extracted from
     images of the given size in /train and /test directiories under collection_dir.
@@ -148,8 +178,8 @@ def read_data_sets(collection_directory, one_hot=True, dtype=tf.float32):
     train_dir = os.path.join(collection_directory, "train")
     test_dir = os.path.join(collection_directory, "test")
 
-    train_images, train_labels = extract_images_and_labels(train_dir, width, height, one_hot)
-    test_images, test_labels = extract_images_and_labels(test_dir, width, height, one_hot)
+    train_images, train_labels = extract_images_and_labels(train_dir, width, height)
+    test_images, test_labels = extract_images_and_labels(test_dir, width, height)
 
     data_sets.train = DataSet(train_images, train_labels, dtype=dtype)
     data_sets.test = DataSet(test_images, test_labels, dtype=dtype)

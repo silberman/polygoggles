@@ -2,13 +2,7 @@
 Functions for generating random polygon PNGs.
 
 Usage:
-draw_random_polygon(max_edges=9, allow_rotation=True, image_width=480, image_height=640)
-
-draw_polygon(num_edges, edge_length=30, rotate_degrees=0,
-             image_width=100, image_height=100, show=False)
-
-Default behavior is to draw an approximately-centered red polygon on a white image, output as
-a .png to the /images directory.
+make_many_random_polygons(num_to_make, directory, image_width, image_height, allow_rotation)
 
 The number of edges in the polygon is included in the filename.
 """
@@ -24,27 +18,37 @@ import time
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_IMAGES_DIR = os.path.join(THIS_DIR, "images")
 
-def draw_random_polygon(image_dir, max_edges=9, allow_rotation=True, image_width=480,
-                        image_height=640):
-    num_edges = random.randint(3, max_edges)
+PIL_IMAGE_MODE = "L" # RGB
 
-    # Figure out some reasonable bounds on the edge_size for an image of the given size.
-    max_allowed_edge_length = int(min(image_width, image_height) / 3.3)
-    min_allowed_edge_length = min(10, max_allowed_edge_length)
-    edge_length = random.randint(min_allowed_edge_length, max_allowed_edge_length)
+def make_many_random_polygons(num_to_make, directory, image_width, image_height, allow_rotation):
+    polygon_filenames_made = []
+    batch_id = "%sz%s" % (int(time.time()), int(random.random() * 10000000))
+    for polygon_making in range(num_to_make):
+        # Pick a random number of edges, constant edge length, and rotation
+        num_edges = random.randint(3, 9)
+        # Figure out some reasonable bounds on the edge_size for an image of the given size.
+        max_allowed_edge_length = int(min(image_width, image_height) / 3.3)
+        min_allowed_edge_length = min(10, max_allowed_edge_length)
+        edge_length = random.randint(min_allowed_edge_length, max_allowed_edge_length)
 
-    if allow_rotation:
-        rotate_degrees = random.uniform(0.0, 360.0)
-    else:
-        rotate_degrees = 0
-    return draw_polygon(num_edges,
-                        image_dir,
-                        edge_length=edge_length,
-                        rotate_degrees=rotate_degrees,
-                        image_width=image_width,
-                        image_height=image_height)
+        if allow_rotation:
+            rotate_degrees = random.uniform(0.0, 360.0)
+        else:
+            rotate_degrees = 0
 
-def draw_polygon(num_edges, image_dir, edge_length=30, rotate_degrees=0,
+        # Make the filename.  We include the number of edges as a label in the filename,
+        # along with the width and height. The rest of the filename is just to avoid duplicates.
+        output_partial_filename = "polygon_%s_%s_%s_%s_%s.png" % (num_edges, image_width,
+                    image_height, polygon_making, batch_id)
+        output_full_filename = os.path.join(directory, output_partial_filename)
+        filename_made = draw_polygon(num_edges,
+                                     output_full_filename,
+                                     edge_length=edge_length,
+                                     rotate_degrees=rotate_degrees,
+                                     image_width=image_width,
+                                     image_height=image_height)
+
+def draw_polygon(num_edges, to_filename, edge_length=30, rotate_degrees=0,
                  image_width=100, image_height=100, show=False):
     """
     Draw a polygon and save it as a PNG.  Return the filename created.
@@ -79,20 +83,14 @@ def draw_polygon(num_edges, image_dir, edge_length=30, rotate_degrees=0,
     vertices = [(x + x_offset, y + y_offset) for x, y in vertices]
 
     # draw it
-    image = Image.new('RGB', (image_width, image_height), 'white')
+    image = Image.new(PIL_IMAGE_MODE, (image_width, image_height), 'white')
     drawer = ImageDraw.Draw(image)
     drawer.polygon(vertices, fill=128, outline=128)
-
-    # Write the image to a file.  We include the number of edges as a label in the filename,
-    # along with the width and height. The rest of the filename is just to avoid duplicates.
-    output_partial_filename = "polygon_%s_%s_%s_%s%s.png" % (
-        num_edges, image_width, image_height, int(time.time()), int(random.random() * 100000))
-    output_full_filename = os.path.join(image_dir, output_partial_filename)
-    image.save(output_full_filename, "PNG")
+    image.save(to_filename, "PNG")
     if show:
         image.show()
-    print("Wrote:", output_full_filename)
-    return output_full_filename
+
+    return to_filename
 
 def _angles_of_a_polygon(num_edges):
     """
@@ -133,7 +131,7 @@ def _rotate_polygon(vertices, degrees):
     return rotated_vertices
 
 def make_collection(image_width, image_height, num_train_images, num_test_images,
-                    root_dir=BASE_IMAGES_DIR):
+                    root_dir=BASE_IMAGES_DIR, allow_rotation=True):
     """
     A collection is a directory of directories of images, with all images of the same shape.
 
@@ -154,11 +152,13 @@ def make_collection(image_width, image_height, num_train_images, num_test_images
     os.makedirs(train_dir)
     os.makedirs(test_dir)
 
-    train_names = [draw_random_polygon(train_dir, image_width=image_width, image_height=image_height)
-                   for __ in range(num_train_images)]
-    test_names = [draw_random_polygon(test_dir, image_width=image_width, image_height=image_height)
-                   for __ in range(num_test_images)]
-
+    print("Making %s training images..." % num_train_images)
+    train_names = make_many_random_polygons(num_train_images, train_dir, image_width, image_height,
+                                            allow_rotation)
+    print("Making %s testing images..." % num_test_images)
+    test_names = make_many_random_polygons(num_test_images, test_dir, image_width, image_height,
+                                           allow_rotation)
+    print("Wrote collection to:", full_collection_dir)
     return full_collection_dir
 
 def main():
@@ -171,6 +171,7 @@ def main():
     parser.add_argument('num_images', help='How many images to make.', type=int)
     parser.add_argument('width', help='Pixel width of the images to make.', type=int)
     parser.add_argument('height', help='Pixel height of the imags to make.', type=int)
+    parser.add_argument('--norotate', help='Do not rotate polygons.', action='store_true')
     args = parser.parse_args()
     assert args.num_images > 1
 
@@ -178,8 +179,9 @@ def main():
     num_test_images = math.ceil(0.2 * args.num_images)
     num_train_images = args.num_images - num_test_images
 
-    collection_base = make_collection(args.width, args.height, num_train_images, num_test_images)
-    print("Wrote files to", collection_base)
+    allow_rotation = not args.norotate
+    collection_base = make_collection(args.width, args.height, num_train_images, num_test_images,
+                                      allow_rotation=allow_rotation)
 
 
 if __name__ == "__main__":

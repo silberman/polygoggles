@@ -4,30 +4,33 @@ Unittests for make_polygon_pngs.py
 
 import os
 import shutil
+import tempfile
 import unittest
 
 from polygoggles.make_polygon_pngs import make_collection
-
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-TEST_BASE_IMAGES_DIR = os.path.join(THIS_DIR, "images")
 
 
 class Test_make_collection(unittest.TestCase):
 
     def setUp(self):
-        self.directories_to_tearDown = []
+        self.temp_collection_dir = tempfile.mkdtemp()
 
     def tearDown(self):
-        for path in self.directories_to_tearDown:
-            shutil.rmtree(path)
+        shutil.rmtree(self.temp_collection_dir)
 
     def test_make_small_collection(self):
         collection_path = make_collection(5, 5, num_train_images=2, num_test_images=1,
-                                          root_dir=TEST_BASE_IMAGES_DIR)
-        self.directories_to_tearDown.append(collection_path)
+                                          root_dir=self.temp_collection_dir)
+
         self.assertTrue(os.path.isdir(collection_path))
         train_dir = os.path.join(collection_path, "train")
         self.assertEqual(len(os.listdir(train_dir)), 2)
+
+    def test_makes_the_right_amount(self):
+        collection_path = make_collection(5, 5, num_train_images=20000, num_test_images=1,
+                                          root_dir=self.temp_collection_dir)
+        train_dir = os.path.join(collection_path, "train")
+        self.assertEqual(20000, len(os.listdir(train_dir)))
 
 if __name__ == "__main__":
     unittest.main()
