@@ -55,8 +55,9 @@ def run_simple_softmax_on_collection(collection_directory, num_training_steps=10
     """
     collection_directory should be the directory containing folders of /train and /test images,
     created via make_polygon_pngs or otherwise appropriately named with labels.
-    """
 
+    Return the accuracy.
+    """
     data_sets = datasets.read_data_sets(collection_directory)
 
     print("num train examples:", data_sets.train.num_examples)

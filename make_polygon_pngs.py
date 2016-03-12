@@ -20,12 +20,13 @@ BASE_IMAGES_DIR = os.path.join(THIS_DIR, "images")
 
 PIL_IMAGE_MODE = "L" # RGB
 
-def make_many_random_polygons(num_to_make, directory, image_width, image_height, allow_rotation):
+def make_many_random_polygons(num_to_make, directory, image_width, image_height, allow_rotation,
+                              min_edges=3, max_edges=9):
     polygon_filenames_made = []
     batch_id = "%sz%s" % (int(time.time()), int(random.random() * 10000000))
     for polygon_making in range(num_to_make):
         # Pick a random number of edges, constant edge length, and rotation
-        num_edges = random.randint(3, 9)
+        num_edges = random.randint(min_edges, max_edges)
         # Figure out some reasonable bounds on the edge_size for an image of the given size.
         max_allowed_edge_length = int(min(image_width, image_height) / 3.3)
         min_allowed_edge_length = min(10, max_allowed_edge_length)
@@ -131,7 +132,8 @@ def _rotate_polygon(vertices, degrees):
     return rotated_vertices
 
 def make_collection(image_width, image_height, num_train_images, num_test_images,
-                    root_dir=BASE_IMAGES_DIR, allow_rotation=True):
+                    root_dir=BASE_IMAGES_DIR, allow_rotation=True, min_edges=3, max_edges=9,
+                    training_num_edges_limited_to_range=None):
     """
     A collection is a directory of directories of images, with all images of the same shape.
 
@@ -140,6 +142,9 @@ def make_collection(image_width, image_height, num_train_images, num_test_images
     root_dir/coll_28_28_1457049237/test/100_test_images
 
     Return the path to the collection directory.
+
+    If a tuple of training_num_edges_limited_to_range like (min_training_edges, max_training_edges)
+    is given, then the training polygons will be limited to that range.
     """
     assert num_train_images > 0 and num_test_images > 0
     collection_dir_name = "coll_%s_%s_%s" % (image_width, image_height, int(time.time()))
@@ -152,12 +157,17 @@ def make_collection(image_width, image_height, num_train_images, num_test_images
     os.makedirs(train_dir)
     os.makedirs(test_dir)
 
+    if training_num_edges_limited_to_range is not None:
+        min_training_edges, max_training_edges = training_num_edges_limited_to_range
+    else:
+        min_training_edges, max_training_edges = min_edges, max_edges
+
     print("Making %s training images..." % num_train_images)
     train_names = make_many_random_polygons(num_train_images, train_dir, image_width, image_height,
-                                            allow_rotation)
+                                            allow_rotation, min_training_edges, max_training_edges)
     print("Making %s testing images..." % num_test_images)
     test_names = make_many_random_polygons(num_test_images, test_dir, image_width, image_height,
-                                           allow_rotation)
+                                           allow_rotation, min_edges, max_edges)
     print("Wrote collection to:", full_collection_dir)
     return full_collection_dir
 
