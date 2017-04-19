@@ -1,0 +1,22 @@
+
+
+TODOS:
+
+insert a random image from collection_dir/train, just for notebook knowledge
+better comment at top of research notebook
+add Dockerfile and Makefile
+in deep_polygoggles, figure out where the 1036800 comes from, automate that so whole deep_poly is automatable
+make irregular polygons or move to some other data set, like OSM
+look into differnt types of output, rather than one-hot
+continue udacity class
+
+http://www.wildml.com/2015/12/implementing-a-cnn-for-text-classification-in-tensorflow/
+
+
+
+
+To display a local file as an image in a jupyter notebook:
+from IPython.core.display import Image
+Image(filename=(random_img_full_name))
+
+that works if it's a bull /Users/dansilberman, etc etc
